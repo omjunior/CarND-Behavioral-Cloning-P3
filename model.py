@@ -25,7 +25,7 @@ def process_sample(sample):
     # 0 = center, 1 = left, 2 = right
     choice = np.random.choice([0, 1, 2])
     path = './data/IMG/' + sample[choice].split('/')[-1]
-    image = cv2.imread(path)
+    image = cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)
     steering = float(line[3]) * (((choice + 1) % 3) - 1) * DELTA
     flip = np.random.random()
     if (flip > 0.5):
@@ -35,7 +35,7 @@ def process_sample(sample):
 
 def process_sample_no_aug(sample):
     path = './data/IMG/' + sample[0].split('/')[-1]
-    image = cv2.imread(path)
+    image = cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)
     steering = float(line[3])
     return image, steering
 
