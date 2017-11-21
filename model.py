@@ -8,10 +8,10 @@ from random import shuffle
 from sklearn.model_selection import train_test_split
 
 # hyperparams
-DELTA_CAMERA = 0.25
+DELTA_CAMERA = 0.20
 DELTA_SHIFT = 0.005
-EPOCHS = 5
-BATCH = 40
+EPOCHS = 20
+BATCH = 512
 
 def steering_histogram(all_data):
     steering = []
@@ -36,7 +36,7 @@ def reduce_steering_bias(all_data, hist):
 def process_sample(sample):
     # select one camera
     # 0 = center, 1 = left, 2 = right
-    choice = np.random.choice([0, 1, 2])
+    choice = np.random.choice([0, 0, 1, 2]) # 50% center, 25% each other
     path = './data/IMG/' + sample[choice].split('/')[-1]
     image = cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)
     steering = float(sample[3]) + (((choice + 1) % 3) - 1) * DELTA_CAMERA
@@ -168,15 +168,15 @@ model.add(Dense(1))
 model.compile(loss='mse', optimizer='Adam')
 
 print("Training model")
-# earlystop = EarlyStopping(monitor='val_loss', min_delta=0.0001, patience=3, \
-#                           verbose=1, mode='auto')
+earlystop = EarlyStopping(monitor='val_loss', patience=3, \
+                          verbose=1, mode='auto')
 # tensorboard = TensorBoard(log_dir='./logs')
 history = model.fit_generator(generator=train_generator, \
     samples_per_epoch=len(train_samples), \
     validation_data=validation_generator, \
     nb_val_samples=len(validation_samples), \
     nb_epoch=EPOCHS, \
-    callbacks=[])
+    callbacks=[earlystop])
 
 print("Saving model")
 model.save('model.h5')
