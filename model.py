@@ -1,43 +1,92 @@
 import csv
 import cv2
 import sklearn
+import math
 import numpy as np
 import matplotlib.pyplot as plt
 from random import shuffle
 from sklearn.model_selection import train_test_split
 
 # hyperparams
-DELTA = 0.2
+DELTA_CAMERA = 0.25
+DELTA_SHIFT = 0.005
 EPOCHS = 5
 BATCH = 40
 
-print("Reading CSV file")
-lines = []
-with open('./data/driving_log.csv', 'r') as cvsfile:
-    reader = csv.reader(cvsfile)
-    next(reader, None) #skip header
-    for line in reader:
-        lines.append(line)
+def steering_histogram(all_data):
+    steering = []
+    for line in all_data:
+        steering.append(float(line[3]))
+    st_np = np.array(steering)
+    hist = np.histogram(np.abs(st_np), bins=10, range=(0, 1))
+    hist = hist[0] / np.sum(hist[0])
+    return hist
 
-train_samples, validation_samples = train_test_split(lines, test_size=0.2)
+def reduce_steering_bias(all_data, hist):
+    new_data = []
+    for i in range(0, 3):
+        for line in all_data:
+            steering = float(line[3])
+            dup = np.random.random()
+            if (dup < ((1 - hist[min(9, int(math.floor(abs(steering)/0.1)))]) ** 2) ):
+                new_data.append(line)
+    all_data.extend(new_data)
+    return all_data
 
 def process_sample(sample):
+    # select one camera
     # 0 = center, 1 = left, 2 = right
     choice = np.random.choice([0, 1, 2])
     path = './data/IMG/' + sample[choice].split('/')[-1]
     image = cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)
-    steering = float(line[3]) * (((choice + 1) % 3) - 1) * DELTA
+    steering = float(sample[3]) + (((choice + 1) % 3) - 1) * DELTA_CAMERA
+    # flips the image
     flip = np.random.random()
     if (flip > 0.5):
         image = cv2.flip(image, 1)
         steering = -1.0 * steering
+    # brightness
+    bounded = True
+    bright = np.random.normal(loc=1, scale=0.3)
+    hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
+    hsv[:,:,2] = np.uint8(np.minimum(255, hsv[:,:,2] * bright))
+    image = cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)
+    # shifting
+    shift_h = np.random.normal(loc=0, scale=10)
+    shift_v = np.random.normal(loc=0, scale=10)
+    steering = steering + shift_h * DELTA_SHIFT
+    M = np.float32([[1, 0, shift_h], [0, 1, shift_v]])
+    image = cv2.warpAffine(image, M, (320, 160))
+
     return image, steering
 
 def process_sample_no_aug(sample):
     path = './data/IMG/' + sample[0].split('/')[-1]
     image = cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)
-    steering = float(line[3])
+    steering = float(sample[3])
     return image, steering
+
+def show_image_examples(samples):
+    n = len(samples)
+    orig = []
+    for i in range(0, n):
+        orig.append(process_sample_no_aug(samples[i]))
+    proc = []
+    for i in range(0, n):
+        proc.append(process_sample(samples[i]))
+
+    plt.figure()
+    for s in range(0, n):
+        plt.subplot(2, n, s+1)
+        plt.title(orig[s][1])
+        plt.axis('off')
+        plt.imshow(orig[s][0])
+    for s in range(0, n):
+        plt.subplot(2, n, n+s+1)
+        plt.title(proc[s][1])
+        plt.axis('off')
+        plt.imshow(proc[s][0])
+    plt.show()
 
 def generator(samples, batch_size, augment):
     num_samples = len(samples)
@@ -57,6 +106,28 @@ def generator(samples, batch_size, augment):
             X_train = np.array(images)
             y_train = np.array(angles)
             yield sklearn.utils.shuffle(X_train, y_train)
+
+
+print("Reading CSV file")
+lines = []
+with open('./data/driving_log.csv', 'r') as cvsfile:
+    reader = csv.reader(cvsfile)
+    next(reader, None) #skip header
+    for line in reader:
+        lines.append(line)
+
+train_samples, validation_samples = train_test_split(lines, test_size=0.2)
+
+# print("Before")
+percent_hist = steering_histogram(train_samples)
+# print(percent_hist)
+train_samples = reduce_steering_bias(train_samples, percent_hist)
+# print("After")
+# percent_hist = steering_histogram(train_samples)
+# print(percent_hist)
+
+# shuffle(train_samples)
+# show_image_examples(train_samples[0:5])
 
 train_generator = generator(train_samples, BATCH, True)
 validation_generator = generator(validation_samples, BATCH, False)
