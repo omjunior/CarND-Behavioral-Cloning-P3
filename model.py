@@ -12,6 +12,7 @@ DELTA_CAMERA = 0.20
 DELTA_SHIFT = 0.005
 EPOCHS = 20
 BATCH = 512
+DROP = 0.5
 
 def steering_histogram(all_data):
     steering = []
@@ -118,6 +119,8 @@ with open('./data/driving_log.csv', 'r') as cvsfile:
 
 train_samples, validation_samples = train_test_split(lines, test_size=0.2)
 
+print("  Train set with {} samples (before bias reduction)".format(len(train_samples)))
+
 # print("Before")
 percent_hist = steering_histogram(train_samples)
 # print(percent_hist)
@@ -129,15 +132,15 @@ train_samples = reduce_steering_bias(train_samples, percent_hist)
 # shuffle(train_samples)
 # show_image_examples(train_samples[0:5])
 
+print("  Train set with {} samples (after bias reduction)".format(len(train_samples)))
+print("  Validation set with {} samples (before bias reduction)".format(len(validation_samples)))
+
 train_generator = generator(train_samples, BATCH, True)
 validation_generator = generator(validation_samples, BATCH, False)
 
-print("  Train set with {} samples".format(len(train_samples)))
-print("  Validation set with {} samples".format(len(validation_samples)))
-
 print("Building keras model")
 from keras.models import Sequential
-from keras.layers import Cropping2D, Flatten, Dense, Lambda
+from keras.layers import Cropping2D, Flatten, Dense, Lambda, Dropout
 from keras.layers.convolutional import Convolution2D
 from keras.callbacks import EarlyStopping, TensorBoard
 
@@ -153,13 +156,19 @@ model.add(Convolution2D(36, 5, 5, activation="relu", subsample=(2, 2)))
 # 16 x 77 x 36
 model.add(Convolution2D(48, 5, 5, activation="relu", subsample=(2, 2)))
 # 6 x 37 x 48
+model.add(Dropout(DROP))
+# 6 x 37 x 48
 model.add(Convolution2D(64, 3, 3, activation="relu"))
 # 4 x 35 x 64
 model.add(Convolution2D(64, 3, 3, activation="relu"))
 # 2 x 33 x 64
+model.add(Dropout(DROP))
+# 2 x 33 x 64
 model.add(Flatten())
 # 4224
 model.add(Dense(100, activation="relu"))
+# 100
+model.add(Dropout(DROP))
 # 100
 model.add(Dense(50, activation="relu"))
 # 50
