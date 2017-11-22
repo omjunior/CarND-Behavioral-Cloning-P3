@@ -44,9 +44,8 @@ class SimplePIController:
 
 
 controller = SimplePIController(0.1, 0.002)
-set_speed = 9
-controller.set_desired(set_speed)
-
+min_speed = 15
+max_speed = 30
 
 @sio.on('telemetry')
 def telemetry(sid, data):
@@ -63,6 +62,7 @@ def telemetry(sid, data):
         image_array = np.asarray(image)
         steering_angle = float(model.predict(image_array[None, :, :, :], batch_size=1))
 
+        controller.set_desired( (1-abs(steering_angle)) * (max_speed-min_speed) + min_speed )
         throttle = controller.update(float(speed))
 
         print(steering_angle, throttle)
