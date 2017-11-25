@@ -176,6 +176,9 @@ model.add(Dense(1))
 
 model.compile(loss='mse', optimizer='Adam')
 
+#from keras.utils.visualize_util import plot
+#plot(model, 'model.png', show_shapes=True, show_layer_names=False)
+
 print("Training model")
 earlystop = EarlyStopping(monitor='val_loss', patience=3, \
                           verbose=1, mode='auto')
