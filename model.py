@@ -14,6 +14,7 @@ EPOCHS = 20
 BATCH = 512
 DROP = 0.5
 
+# computes a histogram for steering angles on the input data (resolution 0.1)
 def steering_histogram(all_data):
     steering = []
     for line in all_data:
@@ -23,6 +24,7 @@ def steering_histogram(all_data):
     hist = hist[0] / np.sum(hist[0])
     return hist
 
+# reduces the concentration of low steering angle data points
 def reduce_steering_bias(all_data, hist):
     new_data = []
     for i in range(0, 3):
@@ -34,6 +36,7 @@ def reduce_steering_bias(all_data, hist):
     all_data.extend(new_data)
     return all_data
 
+# Returns an image with random augmentations
 def process_sample(sample):
     # select one camera
     # 0 = center, 1 = left, 2 = right
@@ -43,16 +46,16 @@ def process_sample(sample):
     steering = float(sample[3]) + (((choice + 1) % 3) - 1) * DELTA_CAMERA
     # flips the image
     flip = np.random.random()
-    if (flip > 0.5):
+    if (flip > 0.5): # 50% chance
         image = cv2.flip(image, 1)
         steering = -1.0 * steering
-    # brightness
+    # brightness augmentation
     bounded = True
     bright = np.random.normal(loc=1, scale=0.3)
     hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
     hsv[:,:,2] = np.uint8(np.minimum(255, hsv[:,:,2] * bright))
     image = cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)
-    # shifting
+    # translation
     shift_h = np.random.normal(loc=0, scale=10)
     shift_v = np.random.normal(loc=0, scale=10)
     steering = steering + shift_h * DELTA_SHIFT
@@ -61,12 +64,14 @@ def process_sample(sample):
 
     return image, steering
 
+# retuns the image of that line (no augmentation - for validation)
 def process_sample_no_aug(sample):
     path = './data/IMG/' + sample[0].split('/')[-1]
     image = cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)
     steering = float(sample[3])
     return image, steering
 
+# plot augmentations exapmples
 def show_image_examples(samples):
     n = len(samples)
     orig = []
@@ -89,6 +94,7 @@ def show_image_examples(samples):
         plt.imshow(proc[s][0])
     plt.show()
 
+# defines the generator to feed Keras model
 def generator(samples, batch_size, augment):
     num_samples = len(samples)
     while 1: # Loop forever so the generator never terminates
@@ -117,6 +123,7 @@ with open('./data/driving_log.csv', 'r') as cvsfile:
     for line in reader:
         lines.append(line)
 
+# Split 80% - 20%
 train_samples, validation_samples = train_test_split(lines, test_size=0.2)
 
 print("  Train set with {} samples (before bias reduction)".format(len(train_samples)))
